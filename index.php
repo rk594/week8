@@ -1,86 +1,180 @@
-re_once __DIR__.'/sys/Database.php';
-require_once __DIR__ . '/managers/UserManager.php';
-?>
-<html>
-<head>
-<title>PDO</title>
-<link href="css/bootstrap.min.css" rel="stylesheet">
-<style>
-thead > tr > td {
-font-weight: bold;
-}
-</style>
-</head>
-<body>
-<div class="container">
-<div class="row">
-<div class="col-lg-12">
 <?php
-$conn = null;
-$users = null;
-$database = new Database();
-try {
-$conn = $database->getConnection();
-echo "Connected successfully!<br>";
-} catch (\Exception $e) {
-echo $e->getMessage()."<br>";
+//turn on debugging messages
+//ini_set('display_errors', 'On');
+error_reporting(E_ERROR );
+define('DATABASE', '');
+define('USERNAME', '');
+define('PASSWORD', '');
+define('CONNECTION', '');
+class dbConn{
+	//variable to hold connection object.
+	protected static $db;
+	//private construct - class cannot be instatiated externally.
+	private function __construct() {
+		try {
+			// assign PDO object to db variable
+			self::$db = new PDO( 'mysql:host=' . CONNECTION .';dbname=' . DATABASE, USERNAME, PASSWORD );
+			self::$db->setAttribute( PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION );
+		}
+		catch (PDOException $e) {
+			//Output error - would normally log this to error file rather than output to
+user.
+			echo "Connection Error: " . $e->getMessage();
+		}
+	}		
+	// get connection function. Static method - accessible without instantiation
+	public static function getConnection() {
+		//Guarantees single instance, if no connection object exists then create one.
+		if (!self::$db) {
+			//new connection object.
+			new dbConn();
+		}
+		//return connection.
+		return self::$db;
+	}
+}
+class collection {
+	static public function create() {
+		$model = new static::$modelName;
+		return $model;
+	}
+	static public function findAll() {
+		$db = dbConn::getConnection();
+		$tableName = get_called_class();
+		$sql = 'SELECT * FROM ' . $tableName;
+		$statement = $db->prepare($sql);
+		$statement->execute();
+		$class = static::$modelName;
+		$statement->setFetchMode(PDO::FETCH_CLASS, $class);
+		$recordsSet =  $statement->fetchAll();
+		echo " Print full table:" .$tableName;
+		return $recordsSet;
+	}
+	static public function findOne($id) {
+		$db = dbConn::getConnection();
+		$tableName = get_called_class();
+		$sql = 'SELECT * FROM ' . $tableName . ' WHERE id =' . $id;
+		$statement = $db->prepare($sql);
+		$statement->execute();
+		$class = static::$modelName;
+		$statement->setFetchMode(PDO::FETCH_CLASS, $class);
+		$recordsSet =  $statement->fetchAll();
+		echo "Print one record :". $tableName;
+		return $recordsSet[0];
+	}
+}
+class accounts extends collection {
+	protected static $modelName = 'account';
+}
+class todos extends collection {
+	protected static $modelName = 'todo';
+}
+class model {
+	//protected $id;
+	public function save()
+	{
+		if ($this->id = '') {
+			$sql = $this->insert();
+		} else {
+			$sql = $this->update();
+		}
+		$db = dbConn::getConnection();
+		$statement = $db->prepare($sql);
+		$statement->execute();
+		$tableName = get_called_class();
+		$array = get_object_vars($this);
+		$columnString = implode(',', $array);
+		$valueString = ":".implode(',:', $array);
+		echo "INSERT INTO $tableName (" . $columnString . ") VALUES (" .$valueString . ")</br>";
+		echo 'I just saved record: ' . $this->id;
+	}
+}
+class account extends model {
+	public $id;
+	public $email;
+	public $fname;
+	public $lname;
+	public $phone;
+	public $birthday;
+	public $gender;
+	public $password;
+	protected static $modelName = 'account';
+	public static function getTablename(){
+		$tableName='accounts';
+		return $tableName;
+	}
+}
+class todo extends model {
+	public $id;
+	public $owneremail;
+	public $ownerid;
+	public $createddate;
+	public $duedate;
+	public $message;
+	public $isdone;
+	
+	protected static $modelName = 'todo';
+	public static function getTablename(){
+		$tableName='todos';
+		return $tableName;
+	}
+}
+
+class htmlTable{
+	public function genarateTable($record){
+		$tableGen = '<table border="1" cellpadding="2" cellspacing="3">';
+
+			foreach($record as $row => $innerArray){
+			$tableGen .= '<tr>';
+			foreach($innerArray as $innerRow => $value){
+
+				$tableGen .= '<td>' . $value.'</td>';
+			}
+			$tableGen.='</tr>';
+		}
+		}
+		$tableGen .= '</table>';
+		print_r($tableGen);
+	}
+}
+$obj = new htmlTable();
+$obj = new main();
+class main
+{
+	public function __construct()
+	{
+		$records = todos::findAll();
+		$tableGen = htmlTable::genarateTable($records);
+		$id=124;
+		$records = todos::findOne($id);
+		$tableGen = htmlTable::genarateTable($records);
+		//insert one record
+		$record = new todo();
+		$record->id='';
+		$record->owneremail="";
+		$record->ownerid=;
+		$record->createddate="";
+		$record->duedate="";
+		$record->message="";
+		$record->isdone='';
+		$record->save();
+		$records = todos::findAll();
+		$tableGen = htmlTable::genarateTable($records);
+		//update one record
+		$record = new todo();
+		$id=4;
+		$record->owneremail="";
+		$record->message="";
+		$record->save();
+		$records = todos::findAll();
+		$tableGen = htmlTable::genarateTable($records);
+		//delete one record
+		$record= new todo();
+		$id=145;
+		$record->delete();
+		$records = todos::findAll();
+		$obj->genarateTable($records);
+		$tableGen = htmlTable::genarateTable($records);
+	}
 }
 ?>
-</div>
-</div>
-<div class="row">
-<div class="col-lg-12">
-<?php
-if($conn !== null) {
-$userManager = new UserManager($conn);
-$users = $userManager->getByIDLessThan(6);
-echo "Number of records: <strong>" . count($users) . "</strong><br>";
-}
-?>
-</div>
-</div>
-<div class="row">
-<div class="col-lg-12" style="padding-top: 20px">
-<?php
-if(!empty($users)) {
-?>
-<table class="table table-bordered">
-<thead>
-<tr>
-<td>ID</td>
-<td>Email</td>
-<td>First Name</td>
-<td>Last Name</td>
-<td>Phone Number</td>
-<td>Birthday</td>
-<td>Gender</td>
-<td>Password</td>
-</tr>
-</thead>
-<tbody>
-<?php
-foreach($users as $user) {
-echo "<tr>";
-echo "<td>".$user['id']."</td>";
-echo "<td>".$user['email']."</td>";
-echo "<td>".$user['fname']."</td>";
-echo "<td>".$user['lname']."</td>";
-echo "<td>".$user['phone']."</td>";
-echo "<td>".$user['birthday']."</td>";
-echo "<td>".$user['gender']."</td>";
-echo "<td>".$user['password']."</td>";
-echo "</tr>";
-}
-?>
-</tbody>
-</table>
-<?php
-}
-?>
-</div>
-</div>
-</div>
-<script src="js/jquery-3.2.1.js"></script>
-<script src="js/bootstrap.min.js"></script>
-</body>
-</html>
